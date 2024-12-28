@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "193208079143",
+    "project_id": "mobilflutter2929",
+    "storage_bucket": "mobilflutter2929.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:193208079143:android:6d5777d7f07875dd918f02",
+        "android_client_info": {
+          "package_name": "com.example.ortak_harcama_takip"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBQ-1m2FHn30YPimlcYcXHtNFDbXcVTjBo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
