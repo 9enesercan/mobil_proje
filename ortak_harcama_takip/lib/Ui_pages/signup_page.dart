@@ -1,10 +1,10 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:ortak_harcama_takip/Ui_pages/signup_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../auth/auth_f.dart';
+import 'login_page.dart';
 import 'home_page.dart';
-import '../auth/auth_f.dart'; // Import the AuthService
 
-class LoginPage extends StatelessWidget {
+class SignUpPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final TextEditingController emailController = TextEditingController();
@@ -13,7 +13,7 @@ class LoginPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Giriş Yap'),
+        title: Text('Kayıt Ol'),
       ),
       body: Padding(
         padding: EdgeInsets.all(16.0),
@@ -49,46 +49,36 @@ class LoginPage extends StatelessWidget {
             SizedBox(height: 24),
             ElevatedButton(
               onPressed: () async {
-                // Login işlemi
-                User? user = await _auth.signInWithEmailAndPassword(
+                // Sign-up işlemi
+                User? user = await _auth.registerWithEmailAndPassword(
                   emailController.text,
                   passwordController.text,
                 );
                 if (user != null) {
-                  // Login başarılı, HomePage'e yönlendirme
+                  // Sign-up başarılı, HomePage'e yönlendirme
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(builder: (context) => HomePage()),
                   );
                 } else {
-                  // Login başarısız, hata mesajı göster
+                  // Sign-up başarısız, hata mesajı göster
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Giriş başarısız. Tekrar deneyin.')),
+                    SnackBar(content: Text('Kayıt başarısız. Tekrar deneyin.')),
                   );
                 }
               },
-              child: Text('Giriş Yap'),
+              child: Text('Kayıt Ol'),
             ),
             SizedBox(height: 16),
             TextButton(
               onPressed: () {
-                // Şifreyi unuttum işlemi (henüz eklenmedi)
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Şifre sıfırlama işlemi gelecek...')),
-                );
-              },
-              child: Text('Şifremi Unuttum'),
-            ),
-            SizedBox(height: 16),
-            TextButton(
-              onPressed: () {
-                // Sign-up sayfasına yönlendirme
+                // Login sayfasına yönlendirme
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => SignUpPage()),
+                  MaterialPageRoute(builder: (context) => LoginPage()),
                 );
               },
-              child: Text('Hesabınız yok mu? Kayıt Olun'),
+              child: Text('Zaten hesabınız var mı? Giriş Yapın'),
             ),
           ],
         ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'add_expense_page.dart';
+import '../auth/auth_f.dart';
+import 'login_page.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -7,6 +9,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  final AuthService _auth = AuthService();
+
   // Dinamik harcama listesi
   final List<Map<String, String>> _expenses = [
     {"title": "Harcama 1", "category": "Yemek", "amount": "₺50"},
@@ -18,6 +22,18 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Ortak Harcamalar'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.logout),
+            onPressed: () async {
+              await _auth.signOut();
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => LoginPage()),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -110,7 +126,8 @@ class _HomePageState extends State<HomePage> {
   // Toplam harcamayı hesaplama
   double _calculateTotal() {
     return _expenses.fold(0, (sum, expense) {
-      final amount = double.tryParse(expense["amount"]?.replaceAll('₺', '') ?? "0") ?? 0;
+      final amount =
+          double.tryParse(expense["amount"]?.replaceAll('₺', '') ?? "0") ?? 0;
       return sum + amount;
     });
   }
