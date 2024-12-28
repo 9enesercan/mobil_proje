@@ -1,67 +1,68 @@
 import 'package:flutter/material.dart';
-import 'home_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'firebase_options.dart';
 
 class LoginPage extends StatelessWidget {
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Giriş Yap'),
-      ),
-      body: Padding(
-        padding: EdgeInsets.all(16.0),
+      body: Container(
+        padding: EdgeInsets.all(20),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Ortak Harcama Takip',
-              style: TextStyle(
-                fontSize: 24.0,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 40),
-            TextField(
+          children: <Widget>[
+            SvgPicture.asset('assets/login_icon.svg', width: 150), // SVG logo
+            SizedBox(height: 50),
+            TextFormField(
+              controller: emailController,
               decoration: InputDecoration(
-                labelText: 'Kullanıcı Adı',
+                labelText: 'Email',
                 border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.email),
               ),
+              keyboardType: TextInputType.emailAddress,
             ),
-            SizedBox(height: 16),
-            TextField(
+            SizedBox(height: 20),
+            TextFormField(
+              controller: passwordController,
               decoration: InputDecoration(
                 labelText: 'Şifre',
                 border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.lock),
               ),
               obscureText: true,
             ),
-            SizedBox(height: 24),
+            SizedBox(height: 30),
             ElevatedButton(
-              onPressed: () {
-                // Login işlemi sonrası HomePage'e yönlendirme
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => HomePage()),
-                );
+              style: ElevatedButton.styleFrom(
+                minimumSize: Size(double.infinity, 50), // full width
+              ),
+              child: Text('Giriş Yap', style: TextStyle(fontSize: 16)),
+              onPressed: () async {
+                try {
+                  await Firebase.initializeApp(
+                    options: DefaultFirebaseOptions.currentPlatform,
+                  );
+                  UserCredential userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+                      email: emailController.text,
+                      password: passwordController.text
+                  );
+                  Navigator.pushReplacementNamed(context, '/home');
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('Giriş başarısız: ${e.toString()}')
+                  ));
+                }
               },
-              child: Text('Giriş Yap'),
-            ),
-            SizedBox(height: 16),
-            TextButton(
-              onPressed: () {
-                // Şifreyi unuttum işlemi (henüz eklenmedi)
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Şifre sıfırlama işlemi gelecek...')),
-                );
-              },
-              child: Text('Şifremi Unuttum'),
-
-            ),
+            )
           ],
         ),
       ),
     );
   }
 }
+
