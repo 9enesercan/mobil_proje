@@ -22,10 +22,19 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadExpenses() async {
-    final data = await _dbHelper.getExpenses();
-    setState(() {
-      _expenses = data;
-    });
+    try {
+      // SQLite'tan verileri çek
+      final localData = await _dbHelper.getExpenses();
+
+      // Listeyi temizle ve sadece benzersiz kayıtları ekle
+      setState(() {
+        _expenses = localData.toSet().toList();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Veriler yüklenirken hata oluştu: $e')),
+      );
+    }
   }
 
   @override
@@ -67,34 +76,36 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              itemCount: _expenses.length,
-              itemBuilder: (context, index) {
-                final expense = _expenses[index];
-                return Card(
-                  margin: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: ListTile(
-                    leading: Icon(
-                      Icons.category,
-                      color: _getCategoryColor(expense["category"] ?? ""),
-                    ),
-                    title: Text(expense["title"] ?? ""),
-                    subtitle: Text('Kategori: ${expense["category"]}'),
-                    trailing: Text(
-                      expense["amount"] ?? "",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green,
-                      ),
-                    ),
-                    onLongPress: () async {
-                      await _dbHelper.deleteExpense(expense["id"]);
-                      _loadExpenses();
+            child: _expenses.isEmpty
+                ? Center(child: Text('Harcama bulunamadı'))
+                : ListView.builder(
+                    itemCount: _expenses.length,
+                    itemBuilder: (context, index) {
+                      final expense = _expenses[index];
+                      return Card(
+                        margin:
+                            EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                        child: ListTile(
+                          leading: Icon(
+                            Icons.category,
+                            color: _getCategoryColor(expense["category"] ?? ""),
+                          ),
+                          title: Text(expense["title"] ?? ""),
+                          subtitle: Text('Kategori: ${expense["category"]}'),
+                          trailing: Text(
+                            '₺${expense["amount"]}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                          onLongPress: () async {
+                            await _deleteExpense(expense["id"]);
+                          },
+                        ),
+                      );
                     },
                   ),
-                );
-              },
-            ),
           ),
         ],
       ),
@@ -105,8 +116,7 @@ class _HomePageState extends State<HomePage> {
             MaterialPageRoute(
               builder: (context) => AddExpensePage(
                 onAddExpense: (newExpense) async {
-                  await _dbHelper.insertExpense(newExpense);
-                  _loadExpenses();
+                  await _addExpense(newExpense);
                 },
               ),
             ),
@@ -116,6 +126,38 @@ class _HomePageState extends State<HomePage> {
         tooltip: 'Harcama Ekle',
       ),
     );
+  }
+
+  Future<void> _addExpense(Map<String, String> newExpense) async {
+    try {
+      // Sadece SQLite'a ekle
+      await _dbHelper.insertExpense(newExpense);
+
+      // Listeyi güncelle
+      _loadExpenses();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Harcama eklenirken hata oluştu: $e')),
+      );
+    }
+  }
+
+  Future<void> _deleteExpense(int id) async {
+    try {
+      // SQLite'tan sil
+      await _dbHelper.deleteExpense(id);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Harcama başarıyla silindi')),
+      );
+
+      // Listeyi güncelle
+      _loadExpenses();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Harcama silinirken hata oluştu: $e')),
+      );
+    }
   }
 
   Color _getCategoryColor(String category) {
@@ -137,8 +179,7 @@ class _HomePageState extends State<HomePage> {
 
   double _calculateTotal() {
     return _expenses.fold(0, (sum, expense) {
-      final amount =
-          double.tryParse(expense["amount"]?.replaceAll('₺', '') ?? "0") ?? 0;
+      final amount = double.tryParse(expense["amount"]?.toString() ?? "0") ?? 0;
       return sum + amount;
     });
   }
