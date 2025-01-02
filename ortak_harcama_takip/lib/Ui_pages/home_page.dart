@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:ortak_harcama_takip/db/database_helper.dart';
-import 'package:ortak_harcama_takip/Ui_pages/add_expense_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:ortak_harcama_takip/auth/auth_f.dart';
 import 'package:ortak_harcama_takip/Ui_pages/login_page.dart';
+import 'package:ortak_harcama_takip/Ui_pages/group_expenses_page.dart'; // Add this line
+
+import 'add_group_page.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -11,34 +14,72 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final AuthService _auth = AuthService();
-  final DatabaseHelper _dbHelper = DatabaseHelper.instance;
-
-  List<Map<String, dynamic>> _expenses = [];
+  User? _currentUser;
+  List<Map<String, dynamic>> _groups = [];
 
   @override
   void initState() {
     super.initState();
-    _loadExpenses();
+    _currentUser = FirebaseAuth.instance.currentUser;
+    _loadGroups();
   }
 
-  Future<void> _loadExpenses() async {
+  Future<void> _loadGroups() async {
     try {
-      // SQLite'tan verileri çek
-      final localData = await _dbHelper.getExpenses();
+      final QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .where('members', arrayContains: _currentUser?.uid)
+          .get();
 
-      // Listeyi temizle ve sadece benzersiz kayıtları ekle
       setState(() {
-        _expenses = localData.toSet().toList();
+        _groups = snapshot.docs
+            .map((doc) => {
+                  ...doc.data() as Map<String, dynamic>,
+                  'id': doc.id,
+                  'members': List<String>.from(doc['members']),
+                })
+            .toList();
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Veriler yüklenirken hata oluştu: $e')),
+        SnackBar(content: Text('Gruplar yüklenirken hata oluştu: $e')),
+      );
+    }
+  }
+
+  Future<void> _joinGroup(String groupJoinId) async {
+    try {
+      final QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .where('groupJoinId', isEqualTo: groupJoinId)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final DocumentReference groupRef = snapshot.docs.first.reference;
+        await groupRef.update({
+          'members': FieldValue.arrayUnion([_currentUser?.uid])
+        });
+        _loadGroups();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gruba başarıyla katıldınız')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Grup bulunamadı')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gruba katılırken hata oluştu: $e')),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final TextEditingController groupJoinIdController = TextEditingController();
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Ortak Harcamalar'),
@@ -57,55 +98,58 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Column(
         children: [
-          // Toplam harcama özet bölümü
-          Container(
-            padding: EdgeInsets.all(16.0),
-            color: Colors.blue[100],
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Toplam Harcama:',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  '₺${_calculateTotal()}',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
           Expanded(
-            child: _expenses.isEmpty
-                ? Center(child: Text('Harcama bulunamadı'))
+            child: _groups.isEmpty
+                ? Center(child: Text('Grup bulunamadı'))
                 : ListView.builder(
-                    itemCount: _expenses.length,
+                    itemCount: _groups.length,
                     itemBuilder: (context, index) {
-                      final expense = _expenses[index];
+                      final group = _groups[index];
                       return Card(
-                        margin:
-                            EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                        margin: EdgeInsets.symmetric(
+                            horizontal: 16.0, vertical: 8.0),
                         child: ListTile(
-                          leading: Icon(
-                            Icons.category,
-                            color: _getCategoryColor(expense["category"] ?? ""),
-                          ),
-                          title: Text(expense["title"] ?? ""),
-                          subtitle: Text('Kategori: ${expense["category"]}'),
-                          trailing: Text(
-                            '₺${expense["amount"]}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green,
-                            ),
-                          ),
-                          onLongPress: () async {
-                            await _deleteExpense(expense["id"]);
+                          title: Text(group["name"] ?? ""),
+                          subtitle: Text(
+                              'Üyeler: ${group["members"].length}\nGrup ID: ${group["id"]}\nGrup Kayıt ID: ${group["groupJoinId"]}'),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => GroupExpensesPage(
+                                  groupId: group["id"],
+                                  groupName: group["name"],
+                                ),
+                              ),
+                            );
                           },
                         ),
                       );
                     },
                   ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: groupJoinIdController,
+                    decoration: InputDecoration(
+                      labelText: 'Grup Kayıt ID',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () async {
+                    await _joinGroup(groupJoinIdController.text);
+                  },
+                  child: Text('Gruba Katıl'),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -114,73 +158,34 @@ class _HomePageState extends State<HomePage> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => AddExpensePage(
-                onAddExpense: (newExpense) async {
-                  await _addExpense(newExpense);
+              builder: (context) => AddGroupPage(
+                onAddGroup: (newGroup) async {
+                  await _addGroup(newGroup);
                 },
+                currentUser: _currentUser,
               ),
             ),
           );
         },
         child: Icon(Icons.add),
-        tooltip: 'Harcama Ekle',
+        tooltip: 'Grup Ekle',
       ),
     );
   }
 
-  Future<void> _addExpense(Map<String, String> newExpense) async {
+  Future<void> _addGroup(Map<String, dynamic> newGroup) async {
     try {
-      // Sadece SQLite'a ekle
-      await _dbHelper.insertExpense(newExpense);
-
-      // Listeyi güncelle
-      _loadExpenses();
+      newGroup['createdBy'] = _currentUser?.uid ?? '';
+      newGroup['members'] = [_currentUser?.uid ?? ''];
+      newGroup['groupJoinId'] = (100000 +
+              (999999 - 100000) *
+                  (DateTime.now().millisecondsSinceEpoch % 1000000))
+          .toString();
+      _loadGroups();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Harcama eklenirken hata oluştu: $e')),
+        SnackBar(content: Text('Grup eklenirken hata oluştu: $e')),
       );
     }
-  }
-
-  Future<void> _deleteExpense(int id) async {
-    try {
-      // SQLite'tan sil
-      await _dbHelper.deleteExpense(id);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Harcama başarıyla silindi')),
-      );
-
-      // Listeyi güncelle
-      _loadExpenses();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Harcama silinirken hata oluştu: $e')),
-      );
-    }
-  }
-
-  Color _getCategoryColor(String category) {
-    switch (category) {
-      case "Yemek":
-        return Colors.orange;
-      case "Ulaşım":
-        return Colors.blue;
-      case "Eğlence":
-        return Colors.purple;
-      case "Market":
-        return Colors.green;
-      case "Diğer":
-        return Colors.grey;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  double _calculateTotal() {
-    return _expenses.fold(0, (sum, expense) {
-      final amount = double.tryParse(expense["amount"]?.toString() ?? "0") ?? 0;
-      return sum + amount;
-    });
   }
 }
