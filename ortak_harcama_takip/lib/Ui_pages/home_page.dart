@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
-import 'add_expense_page.dart';
-import '../auth/auth_f.dart';
-import 'login_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:ortak_harcama_takip/auth/auth_f.dart';
+import 'package:ortak_harcama_takip/Ui_pages/login_page.dart';
+import 'package:ortak_harcama_takip/Ui_pages/group_expenses_page.dart'; // Add this line
+
+import 'add_group_page.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -10,15 +14,72 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final AuthService _auth = AuthService();
+  User? _currentUser;
+  List<Map<String, dynamic>> _groups = [];
 
-  // Dinamik harcama listesi
-  final List<Map<String, String>> _expenses = [
-    {"title": "Harcama 1", "category": "Yemek", "amount": "₺50"},
-    {"title": "Harcama 2", "category": "Ulaşım", "amount": "₺30"},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _currentUser = FirebaseAuth.instance.currentUser;
+    _loadGroups();
+  }
+
+  Future<void> _loadGroups() async {
+    try {
+      final QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .where('members', arrayContains: _currentUser?.uid)
+          .get();
+
+      setState(() {
+        _groups = snapshot.docs
+            .map((doc) => {
+                  ...doc.data() as Map<String, dynamic>,
+                  'id': doc.id,
+                  'members': List<String>.from(doc['members']),
+                })
+            .toList();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gruplar yüklenirken hata oluştu: $e')),
+      );
+    }
+  }
+
+  Future<void> _joinGroup(String groupJoinId) async {
+    try {
+      final QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .where('groupJoinId', isEqualTo: groupJoinId)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final DocumentReference groupRef = snapshot.docs.first.reference;
+        await groupRef.update({
+          'members': FieldValue.arrayUnion([_currentUser?.uid])
+        });
+        _loadGroups();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gruba başarıyla katıldınız')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Grup bulunamadı')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gruba katılırken hata oluştu: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final TextEditingController groupJoinIdController = TextEditingController();
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Ortak Harcamalar'),
@@ -39,149 +100,94 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Column(
         children: [
-          // Toplam harcama özet bölümü
-          _buildTotalExpenseSummary(),
           Expanded(
-            // Harcama listesi
-            child: _expenses.isEmpty
-                ? Center(
-              child: Text(
-                'Henüz harcama eklenmedi.',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
-            )
+            child: _groups.isEmpty
+                ? Center(child: Text('Grup bulunamadı'))
                 : ListView.builder(
-              itemCount: _expenses.length,
-              itemBuilder: (context, index) {
-                final expense = _expenses[index];
-                return _buildExpenseCard(expense, index);
-              },
+                    itemCount: _groups.length,
+                    itemBuilder: (context, index) {
+                      final group = _groups[index];
+                      return Card(
+                        margin: EdgeInsets.symmetric(
+                            horizontal: 16.0, vertical: 8.0),
+                        child: ListTile(
+                          title: Text(group["name"] ?? ""),
+                          subtitle: Text(
+                              'Üyeler: ${group["members"].length}\nGrup ID: ${group["id"]}\nGrup Kayıt ID: ${group["groupJoinId"]}'),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => GroupExpensesPage(
+                                  groupId: group["id"],
+                                  groupName: group["name"],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: groupJoinIdController,
+                    decoration: InputDecoration(
+                      labelText: 'Grup Kayıt ID',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () async {
+                    await _joinGroup(groupJoinIdController.text);
+                  },
+                  child: Text('Gruba Katıl'),
+                ),
+              ],
             ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _navigateToAddExpensePage(context),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AddGroupPage(
+                onAddGroup: (newGroup) async {
+                  await _addGroup(newGroup);
+                },
+                currentUser: _currentUser,
+              ),
+            ),
+          );
+        },
         child: Icon(Icons.add),
-        tooltip: 'Harcama Ekle',
+        tooltip: 'Grup Ekle',
       ),
     );
   }
 
-  // Toplam harcama özet bölümü
-  Widget _buildTotalExpenseSummary() {
-    return Container(
-      padding: EdgeInsets.all(16.0),
-      color: Colors.blue[100],
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'Toplam Harcama:',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          Text(
-            '₺${_calculateTotal()}',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Harcama kartı oluşturma
-  Widget _buildExpenseCard(Map<String, String> expense, int index) {
-    return Card(
-      margin: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: ListTile(
-        leading: Icon(
-          Icons.category,
-          color: _getCategoryColor(expense["category"] ?? ""),
-        ),
-        title: Text(expense["title"] ?? ""),
-        subtitle: Text('Kategori: ${expense["category"]}'),
-        trailing: Text(
-          expense["amount"] ?? "",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.green,
-          ),
-        ),
-        onLongPress: () => _deleteExpense(index),
-      ),
-    );
-  }
-
-  // Harcama ekleme sayfasına yönlendirme
-  void _navigateToAddExpensePage(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddExpensePage(
-          onAddExpense: (newExpense) {
-            setState(() {
-              _expenses.add(newExpense);
-            });
-          },
-        ),
-      ),
-    );
-  }
-
-  // Harcama silme işlemi
-  void _deleteExpense(int index) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Harcama Sil'),
-          content: Text('Bu harcamayı silmek istediğinizden emin misiniz?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: Text('İptal'),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _expenses.removeAt(index);
-                });
-                Navigator.pop(context);
-              },
-              child: Text('Sil'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // Harcama kategorisine göre renk seçimi
-  Color _getCategoryColor(String category) {
-    switch (category) {
-      case "Yemek":
-        return Colors.orange;
-      case "Ulaşım":
-        return Colors.blue;
-      case "Eğlence":
-        return Colors.purple;
-      case "Market":
-        return Colors.green;
-      case "Diğer":
-        return Colors.grey;
-      default:
-        return Colors.grey;
+  Future<void> _addGroup(Map<String, dynamic> newGroup) async {
+    try {
+      newGroup['createdBy'] = _currentUser?.uid ?? '';
+      newGroup['members'] = [_currentUser?.uid ?? ''];
+      newGroup['groupJoinId'] = (100000 +
+              (999999 - 100000) *
+                  (DateTime.now().millisecondsSinceEpoch % 1000000))
+          .toString();
+      _loadGroups();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Grup eklenirken hata oluştu: $e')),
+      );
     }
-  }
-
-  // Toplam harcamayı hesaplama
-  double _calculateTotal() {
-    return _expenses.fold(0, (sum, expense) {
-      final amount =
-          double.tryParse(expense["amount"]?.replaceAll('₺', '') ?? "0") ?? 0;
-      return sum + amount;
-    });
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../auth/auth_f.dart';
 import 'login_page.dart';
 import 'home_page.dart';
@@ -9,6 +10,7 @@ class SignUpPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextEditingController emailController = TextEditingController();
     final TextEditingController passwordController = TextEditingController();
+    final TextEditingController usernameController = TextEditingController();
     final AuthService _auth = AuthService();
 
     return Scaffold(
@@ -31,9 +33,17 @@ class SignUpPage extends StatelessWidget {
             ),
             SizedBox(height: 40),
             TextField(
-              controller: emailController,
+              controller: usernameController,
               decoration: InputDecoration(
                 labelText: 'Kullanıcı Adı',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              decoration: InputDecoration(
+                labelText: 'E-posta',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -55,6 +65,17 @@ class SignUpPage extends StatelessWidget {
                   passwordController.text,
                 );
                 if (user != null) {
+                  // Kullanıcı bilgilerini Firestore'a kaydet
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .set({
+                    'userId': user.uid,
+                    'username': usernameController.text,
+                    'email': emailController.text,
+                    'createdAt': Timestamp.now(),
+                  });
+
                   // Sign-up başarılı, HomePage'e yönlendirme
                   Navigator.pushReplacement(
                     context,
