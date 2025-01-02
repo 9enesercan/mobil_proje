@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'add_expense_page.dart';
-import '../auth/auth_f.dart';
-import 'login_page.dart';
+import 'package:ortak_harcama_takip/db/database_helper.dart';
+import 'package:ortak_harcama_takip/Ui_pages/add_expense_page.dart';
+import 'package:ortak_harcama_takip/auth/auth_f.dart';
+import 'package:ortak_harcama_takip/Ui_pages/login_page.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -10,12 +11,22 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final AuthService _auth = AuthService();
+  final DatabaseHelper _dbHelper = DatabaseHelper.instance;
 
-  // Dinamik harcama listesi
-  final List<Map<String, String>> _expenses = [
-    {"title": "Harcama 1", "category": "Yemek", "amount": "₺50"},
-    {"title": "Harcama 2", "category": "Ulaşım", "amount": "₺30"},
-  ];
+  List<Map<String, dynamic>> _expenses = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExpenses();
+  }
+
+  Future<void> _loadExpenses() async {
+    final data = await _dbHelper.getExpenses();
+    setState(() {
+      _expenses = data;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,14 +60,13 @@ class _HomePageState extends State<HomePage> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  '₺${_calculateTotal()}', // Dinamik toplam harcama
+                  '₺${_calculateTotal()}',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
           ),
           Expanded(
-            // Harcama listesi
             child: ListView.builder(
               itemCount: _expenses.length,
               itemBuilder: (context, index) {
@@ -77,6 +87,10 @@ class _HomePageState extends State<HomePage> {
                         color: Colors.green,
                       ),
                     ),
+                    onLongPress: () async {
+                      await _dbHelper.deleteExpense(expense["id"]);
+                      _loadExpenses();
+                    },
                   ),
                 );
               },
@@ -90,10 +104,9 @@ class _HomePageState extends State<HomePage> {
             context,
             MaterialPageRoute(
               builder: (context) => AddExpensePage(
-                onAddExpense: (newExpense) {
-                  setState(() {
-                    _expenses.add(newExpense);
-                  });
+                onAddExpense: (newExpense) async {
+                  await _dbHelper.insertExpense(newExpense);
+                  _loadExpenses();
                 },
               ),
             ),
@@ -105,7 +118,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Harcama kategorisine göre renk seçimi
   Color _getCategoryColor(String category) {
     switch (category) {
       case "Yemek":
@@ -123,7 +135,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // Toplam harcamayı hesaplama
   double _calculateTotal() {
     return _expenses.fold(0, (sum, expense) {
       final amount =
