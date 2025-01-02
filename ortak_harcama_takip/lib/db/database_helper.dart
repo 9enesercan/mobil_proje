@@ -3,7 +3,8 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
 class DatabaseHelper {
-  static final DatabaseHelper instance = DatabaseHelper._init(); // Singleton instance
+  static final DatabaseHelper instance =
+      DatabaseHelper._init(); // Singleton instance
   static Database? _database;
 
   DatabaseHelper._init();
@@ -31,7 +32,8 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         category TEXT NOT NULL,
-        amount TEXT NOT NULL
+        amount TEXT NOT NULL,
+        userId TEXT NOT NULL
       )
     ''');
   }
@@ -49,5 +51,10 @@ class DatabaseHelper {
   Future<void> deleteExpense(int id) async {
     final db = await instance.database;
     await db.delete('expenses', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<Map<String, dynamic>>> getExpensesByUser(String? userId) async {
+    final db = await instance.database;
+    return await db.query('expenses', where: 'userId = ?', whereArgs: [userId]);
   }
 }
