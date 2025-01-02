@@ -105,23 +105,54 @@ class _GroupExpensesPageState extends State<GroupExpensesPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AddExpensePage(
-                onAddExpense: (newExpense) async {
-                  await _addExpense(newExpense);
-                },
-                currentUser: _currentUser,
-                groupId: widget.groupId,
-              ),
-            ),
-          );
-        },
-        child: Icon(Icons.add),
-        tooltip: 'Harcama Ekle',
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Harcama Ekle FAB
+          FloatingActionButton(
+            heroTag: "addExpenseTag",
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AddExpensePage(
+                    onAddExpense: (newExpense) async {
+                      await _addExpense(newExpense);
+                    },
+                    currentUser: _currentUser,
+                    groupId: widget.groupId,
+                  ),
+                ),
+              );
+            },
+            child: Icon(Icons.add),
+            tooltip: 'Harcama Ekle',
+          ),
+          SizedBox(height: 10),
+
+          // Fatura Ekle FAB
+          FloatingActionButton(
+            heroTag: "addInvoiceTag",
+            onPressed: () {
+              // Burada Fatura Ekle sayfasına yönlendirmenizi yapabilirsiniz
+              // Örneğin:
+              /*
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AddInvoiceScreen(
+                    groupId: widget.groupId,
+                    // Diğer parametreler
+                  ),
+                ),
+              );
+              */
+            },
+            backgroundColor: Colors.redAccent,
+            child: Icon(Icons.receipt_long),
+            tooltip: 'Fatura Ekle',
+          ),
+        ],
       ),
     );
   }
@@ -157,6 +188,8 @@ class _GroupExpensesPageState extends State<GroupExpensesPage> {
     switch (category) {
       case "Yemek":
         return Colors.orange;
+      case "Eğitim":
+        return const Color.fromARGB(255, 255, 0, 34);
       case "Ulaşım":
         return Colors.blue;
       case "Eğlence":
