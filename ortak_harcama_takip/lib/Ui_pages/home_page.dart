@@ -22,6 +22,7 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Ortak Harcamalar'),
+        centerTitle: true,
         actions: [
           IconButton(
             icon: Icon(Icons.logout),
@@ -32,76 +33,128 @@ class _HomePageState extends State<HomePage> {
                 MaterialPageRoute(builder: (context) => LoginPage()),
               );
             },
+            tooltip: 'Çıkış Yap',
           ),
         ],
       ),
       body: Column(
         children: [
           // Toplam harcama özet bölümü
-          Container(
-            padding: EdgeInsets.all(16.0),
-            color: Colors.blue[100],
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Toplam Harcama:',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  '₺${_calculateTotal()}', // Dinamik toplam harcama
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
+          _buildTotalExpenseSummary(),
           Expanded(
             // Harcama listesi
-            child: ListView.builder(
+            child: _expenses.isEmpty
+                ? Center(
+              child: Text(
+                'Henüz harcama eklenmedi.',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+            )
+                : ListView.builder(
               itemCount: _expenses.length,
               itemBuilder: (context, index) {
                 final expense = _expenses[index];
-                return Card(
-                  margin: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: ListTile(
-                    leading: Icon(
-                      Icons.category,
-                      color: _getCategoryColor(expense["category"] ?? ""),
-                    ),
-                    title: Text(expense["title"] ?? ""),
-                    subtitle: Text('Kategori: ${expense["category"]}'),
-                    trailing: Text(
-                      expense["amount"] ?? "",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green,
-                      ),
-                    ),
-                  ),
-                );
+                return _buildExpenseCard(expense, index);
               },
             ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AddExpensePage(
-                onAddExpense: (newExpense) {
-                  setState(() {
-                    _expenses.add(newExpense);
-                  });
-                },
-              ),
-            ),
-          );
-        },
+        onPressed: () => _navigateToAddExpensePage(context),
         child: Icon(Icons.add),
         tooltip: 'Harcama Ekle',
       ),
+    );
+  }
+
+  // Toplam harcama özet bölümü
+  Widget _buildTotalExpenseSummary() {
+    return Container(
+      padding: EdgeInsets.all(16.0),
+      color: Colors.blue[100],
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Toplam Harcama:',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          Text(
+            '₺${_calculateTotal()}',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Harcama kartı oluşturma
+  Widget _buildExpenseCard(Map<String, String> expense, int index) {
+    return Card(
+      margin: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: ListTile(
+        leading: Icon(
+          Icons.category,
+          color: _getCategoryColor(expense["category"] ?? ""),
+        ),
+        title: Text(expense["title"] ?? ""),
+        subtitle: Text('Kategori: ${expense["category"]}'),
+        trailing: Text(
+          expense["amount"] ?? "",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.green,
+          ),
+        ),
+        onLongPress: () => _deleteExpense(index),
+      ),
+    );
+  }
+
+  // Harcama ekleme sayfasına yönlendirme
+  void _navigateToAddExpensePage(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddExpensePage(
+          onAddExpense: (newExpense) {
+            setState(() {
+              _expenses.add(newExpense);
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  // Harcama silme işlemi
+  void _deleteExpense(int index) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Harcama Sil'),
+          content: Text('Bu harcamayı silmek istediğinizden emin misiniz?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: Text('İptal'),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _expenses.removeAt(index);
+                });
+                Navigator.pop(context);
+              },
+              child: Text('Sil'),
+            ),
+          ],
+        );
+      },
     );
   }
 
