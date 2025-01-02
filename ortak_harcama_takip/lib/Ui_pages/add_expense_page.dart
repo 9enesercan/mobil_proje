@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ortak_harcama_takip/db/database_helper.dart';
 
 class AddExpensePage extends StatefulWidget {
   final Function(Map<String, String>) onAddExpense;
@@ -46,9 +47,9 @@ class _AddExpensePageState extends State<AddExpensePage> {
               value: _selectedCategory,
               items: ['Yemek', 'Ulaşım', 'Eğlence', 'Market']
                   .map((category) => DropdownMenuItem<String>(
-                value: category,
-                child: Text(category),
-              ))
+                        value: category,
+                        child: Text(category),
+                      ))
                   .toList(),
               onChanged: (value) {
                 setState(() {
@@ -71,7 +72,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
     );
   }
 
-  void _addExpense() {
+  void _addExpense() async {
     // Formdaki verileri al
     final String title = _titleController.text;
     final String amount = _amountController.text;
@@ -92,7 +93,16 @@ class _AddExpensePageState extends State<AddExpensePage> {
       'category': category,
     };
 
-    // Harcamayı ana sayfaya gönder
+    // Veritabanına kaydet
+    final dbHelper = DatabaseHelper.instance;
+    await dbHelper.insertExpense(newExpense);
+
+    // Başarılı mesajı göster
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Harcama başarıyla kaydedildi')),
+    );
+
+    // Ana sayfayı güncellemek için callback'i çağır
     widget.onAddExpense(newExpense);
 
     // Geri dön
